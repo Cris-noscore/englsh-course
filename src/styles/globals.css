@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Fira+Code:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-dark-500 text-gray-200;
+  }
+  
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-300;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-neon-cyan rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-neon-pink;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-dark-100/50 backdrop-blur-md border border-neon-cyan/30 rounded-xl shadow-neon;
+  }
+  
+  .neon-border {
+    @apply border border-neon-cyan shadow-neon;
+  }
+  
+  .glow-text {
+    @apply text-neon-cyan animate-glow;
+  }
+  
+  .cyber-button {
+    @apply px-6 py-3 bg-dark-200 border border-neon-cyan text-neon-cyan rounded-lg 
+           hover:shadow-neon hover:border-neon-pink hover:text-neon-pink 
+           transition-all duration-300 font-mono;
+  }
+}

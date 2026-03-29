@@ -11,6 +11,7 @@ import Module from './pages/Module'
 import Lesson from './pages/Lesson'
 import Activities from './pages/Activities'
 import Header from './components/Layout/Header'
+import Profile from './pages/Profile'
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -39,6 +40,11 @@ function AppRoutes() {
         <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Landing />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
+        <Route path="/profile" element={
+  <ProtectedRoute>
+    <Profile />
+  </ProtectedRoute>
+} />
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <Dashboard />

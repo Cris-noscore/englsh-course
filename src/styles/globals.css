@@ -8,41 +8,149 @@
   body {
     @apply bg-dark-500 text-gray-200;
   }
-  
+
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
-  
+
   ::-webkit-scrollbar-track {
     @apply bg-dark-300;
   }
-  
+
   ::-webkit-scrollbar-thumb {
     @apply bg-neon-cyan rounded-full;
   }
-  
+
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-neon-pink;
   }
 }
 
 @layer components {
+  /* ===== COMPONENTES GLOBAIS (inalterados) ===== */
   .glass-card {
     @apply bg-dark-100/50 backdrop-blur-md border border-neon-cyan/30 rounded-xl shadow-neon;
   }
-  
+
   .neon-border {
     @apply border border-neon-cyan shadow-neon;
   }
-  
+
   .glow-text {
     @apply text-neon-cyan animate-glow;
   }
-  
+
   .cyber-button {
-    @apply px-6 py-3 bg-dark-200 border border-neon-cyan text-neon-cyan rounded-lg 
-           hover:shadow-neon hover:border-neon-pink hover:text-neon-pink 
+    @apply px-6 py-3 bg-dark-200 border border-neon-cyan text-neon-cyan rounded-lg
+           hover:shadow-neon hover:border-neon-pink hover:text-neon-pink
            transition-all duration-300 font-mono;
+  }
+
+  /* ===== TEMAS DOS MÓDULOS ===== */
+
+  /* Módulo 1 — Azul */
+  .module-theme-1 {
+    --m-color:   #00b4d8;
+    --m-glow:    rgba(0, 180, 216, 0.25);
+    --m-border:  rgba(0, 180, 216, 0.30);
+    --m-muted:   #0077b6;
+    --m-bg:      rgba(0, 180, 216, 0.07);
+    --m-badge-bg:rgba(0, 180, 216, 0.15);
+  }
+
+  /* Módulo 2 — Amarelo */
+  .module-theme-2 {
+    --m-color:   #f5c400;
+    --m-glow:    rgba(245, 196, 0, 0.22);
+    --m-border:  rgba(245, 196, 0, 0.28);
+    --m-muted:   #b38e00;
+    --m-bg:      rgba(245, 196, 0, 0.07);
+    --m-badge-bg:rgba(245, 196, 0, 0.15);
+  }
+
+  /* Módulo 3 — Verde */
+  .module-theme-3 {
+    --m-color:   #22c55e;
+    --m-glow:    rgba(34, 197, 94, 0.22);
+    --m-border:  rgba(34, 197, 94, 0.28);
+    --m-muted:   #15803d;
+    --m-bg:      rgba(34, 197, 94, 0.07);
+    --m-badge-bg:rgba(34, 197, 94, 0.15);
+  }
+
+  /* Módulo 4 — Laranja */
+  .module-theme-4 {
+    --m-color:   #f97316;
+    --m-glow:    rgba(249, 115, 22, 0.22);
+    --m-border:  rgba(249, 115, 22, 0.28);
+    --m-muted:   #c2410c;
+    --m-bg:      rgba(249, 115, 22, 0.07);
+    --m-badge-bg:rgba(249, 115, 22, 0.15);
+  }
+
+  /* Módulo 5 — Roxo */
+  .module-theme-5 {
+    --m-color:   #a855f7;
+    --m-glow:    rgba(168, 85, 247, 0.22);
+    --m-border:  rgba(168, 85, 247, 0.28);
+    --m-muted:   #7e22ce;
+    --m-bg:      rgba(168, 85, 247, 0.07);
+    --m-badge-bg:rgba(168, 85, 247, 0.15);
+  }
+
+  /* Módulo 6 — Cinza */
+  .module-theme-6 {
+    --m-color:   #94a3b8;
+    --m-glow:    rgba(148, 163, 184, 0.18);
+    --m-border:  rgba(148, 163, 184, 0.25);
+    --m-muted:   #64748b;
+    --m-bg:      rgba(148, 163, 184, 0.07);
+    --m-badge-bg:rgba(148, 163, 184, 0.15);
+  }
+
+  /* ===== CLASSES REUTILIZÁVEIS DOS MÓDULOS ===== */
+
+  /* Card do módulo — substitui glass-card nos módulos */
+  .module-card {
+    background: var(--m-bg);
+    border: 1px solid var(--m-border);
+    box-shadow: 0 0 16px var(--m-glow), inset 0 0 30px rgba(0,0,0,0.2);
+    border-radius: 0.75rem;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+  .module-card:hover {
+    box-shadow: 0 0 28px var(--m-glow), inset 0 0 30px rgba(0,0,0,0.2);
+  }
+
+  /* Título colorido por tema */
+  .module-title {
+    color: var(--m-color);
+    text-shadow: 0 0 8px var(--m-glow);
+  }
+
+  /* Badge nível / completed */
+  .module-badge {
+    background: var(--m-badge-bg);
+    color: var(--m-color);
+    border: 1px solid var(--m-border);
+  }
+
+  /* Barra de progresso */
+  .module-progress-bar {
+    background: linear-gradient(90deg, var(--m-muted), var(--m-color));
+  }
+
+  /* Botão de ação do módulo */
+  .module-button {
+    border: 1px solid var(--m-border);
+    color: var(--m-color);
+    background: var(--m-badge-bg);
+    font-family: 'Fira Code', monospace;
+    transition: box-shadow 0.2s ease, background 0.2s ease;
+  }
+  .module-button:hover {
+    background: var(--m-bg);
+    box-shadow: 0 0 12px var(--m-glow);
   }
 }

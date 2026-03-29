@@ -7,27 +7,59 @@ import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { getExercisesByLesson } from '../utils/exercisesData'
 
+// ─── TEMAS POR MÓDULO ────────────────────────────────────────────────────────
+const MODULE_THEME = {
+  1: { color: '#00b4d8', glow: 'rgba(0,180,216,0.25)',   border: 'rgba(0,180,216,0.30)',   bg: 'rgba(0,180,216,0.07)',   muted: '#0077b6' },
+  2: { color: '#f5c400', glow: 'rgba(245,196,0,0.22)',   border: 'rgba(245,196,0,0.28)',   bg: 'rgba(245,196,0,0.07)',   muted: '#b38e00' },
+  3: { color: '#22c55e', glow: 'rgba(34,197,94,0.22)',   border: 'rgba(34,197,94,0.28)',   bg: 'rgba(34,197,94,0.07)',   muted: '#15803d' },
+  4: { color: '#f97316', glow: 'rgba(249,115,22,0.22)',  border: 'rgba(249,115,22,0.28)',  bg: 'rgba(249,115,22,0.07)',  muted: '#c2410c' },
+  5: { color: '#a855f7', glow: 'rgba(168,85,247,0.22)',  border: 'rgba(168,85,247,0.28)',  bg: 'rgba(168,85,247,0.07)',  muted: '#7e22ce' },
+  6: { color: '#94a3b8', glow: 'rgba(148,163,184,0.18)', border: 'rgba(148,163,184,0.25)', bg: 'rgba(148,163,184,0.07)', muted: '#64748b' },
+}
+
+const LESSON_MODULE_MAP = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 5, 7: 5, 8: 5, 9: 6 }
+
+const LESSON_IMAGES = {
+  1: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=1200&q=80',
+  2: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=1200&q=80',
+  3: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80',
+  4: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=1200&q=80',
+  5: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=1200&q=80',
+  6: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=80',
+  7: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=80',
+  8: 'https://images.unsplash.com/photo-1462556791646-c201b8241a94?w=1200&q=80',
+  9: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80',
+}
+
 const Activities = () => {
   const { lessonId } = useParams()
   const navigate = useNavigate()
   const { user, profile, updateXP } = useAuth()
-  
-  // Detectar modo de visualização
+
+  const moduleId = LESSON_MODULE_MAP[parseInt(lessonId)] || 1
+  const theme = MODULE_THEME[moduleId]
+  const bannerImage = LESSON_IMAGES[parseInt(lessonId)] || LESSON_IMAGES[1]
+
   const searchParams = new URLSearchParams(window.location.search)
   const mode = searchParams.get('mode') // 'results' ou null
-  
+
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState({})
-  const [userAnswers, setUserAnswers] = useState({}) // Para modo results
+  const [userAnswers, setUserAnswers] = useState({})
   const [showFeedback, setShowFeedback] = useState(false)
   const [feedbackType, setFeedbackType] = useState(null)
   const [score, setScore] = useState(0)
-  const [completed, setCompleted] = useState(false)
+
+  // ─── FIX: "activitiesCompleted" é separado de "lessonCompleted" ─────────
+  // A lesson marca completed=true no banco para liberar o módulo seguinte.
+  // Mas as atividades precisam de um estado LOCAL independente.
+  const [activitiesCompleted, setActivitiesCompleted] = useState(false)
+
   const [loading, setLoading] = useState(true)
   const [activities, setActivities] = useState([])
-  const [previousProgress, setPreviousProgress] = useState(null)
+  const [previousAnswers, setPreviousAnswers] = useState(null)
+  const [previousScore, setPreviousScore] = useState(0)
 
-  // Instruções por tipo de atividade
   const activityInstructions = {
     multiple_choice: {
       title: "📝 Multiple Choice",
@@ -52,15 +84,12 @@ const Activities = () => {
 
   const loadActivities = () => {
     const lessonExercises = getExercisesByLesson(parseInt(lessonId))
-    console.log('Lesson ID:', lessonId)
-    console.log('Exercises loaded:', lessonExercises.exercises.length)
     setActivities(lessonExercises.exercises || [])
     setLoading(false)
   }
 
   const checkExistingProgress = async () => {
     if (!user) return
-
     try {
       const { data, error } = await supabase
         .from('user_progress')
@@ -72,14 +101,17 @@ const Activities = () => {
       if (error) throw error
 
       if (data) {
-        setPreviousProgress(data)
-        setCompleted(data.completed || false)
-        setScore(data.score || 0)
-        
-        // Se for modo results, carregar as respostas salvas
-        if (mode === 'results' && data.answers) {
-          setUserAnswers(data.answers)
+        setPreviousScore(data.score || 0)
+        setPreviousAnswers(data.answers || null)
+
+        // ─── FIX: só mostra "completed" se estiver no modo results ─────
+        // Em modo normal (vindo da lesson), sempre começa do zero
+        if (mode === 'results') {
+          setScore(data.score || 0)
+          setUserAnswers(data.answers || {})
+          setActivitiesCompleted(true)
         }
+        // Em modo normal, não seta activitiesCompleted — deixa o aluno jogar
       }
     } catch (error) {
       console.error('Error checking progress:', error)
@@ -88,7 +120,6 @@ const Activities = () => {
 
   const saveProgress = async (finalScore, finalAnswers) => {
     if (!user) return false
-
     try {
       const { error: progressError } = await supabase
         .from('user_progress')
@@ -104,29 +135,17 @@ const Activities = () => {
 
       if (progressError) throw progressError
 
-      // Buscar o progresso anterior para saber se já ganhou XP
-      const { data: existingProgress } = await supabase
-        .from('user_progress')
-        .select('completed')
-        .eq('user_id', user.id)
-        .eq('lesson_id', parseInt(lessonId))
-        .maybeSingle()
-
-      // Só adiciona XP se for a primeira vez que completa
-      if (!existingProgress?.completed) {
+      // Só adiciona XP se for a primeira vez completando as atividades
+      const isFirstTime = !previousAnswers
+      if (isFirstTime && finalScore > 0) {
         const newXP = (profile?.xp || 0) + finalScore
         const newLevel = Math.floor(newXP / 100) + 1
-
         const { error: profileError } = await supabase
           .from('profiles')
           .update({ xp: newXP, level: newLevel })
           .eq('id', user.id)
-
         if (profileError) throw profileError
-
-        if (updateXP) {
-          updateXP(newXP)
-        }
+        if (updateXP) updateXP(newXP)
       }
 
       return true
@@ -138,9 +157,8 @@ const Activities = () => {
   }
 
   const handleAnswer = async (answer) => {
-    if (activities.length === 0) return
-    if (mode === 'results') return // Não permite responder no modo results
-    
+    if (activities.length === 0 || mode === 'results') return
+
     const currentActivity = activities[currentIndex]
     let isCorrect = false
 
@@ -150,13 +168,16 @@ const Activities = () => {
       isCorrect = answer.toLowerCase().trim() === currentActivity.correct.toLowerCase()
     }
 
-    const newAnswers = { ...answers, [currentActivity.id]: { answer, isCorrect, correctAnswer: currentActivity.correct } }
+    const newAnswers = {
+      ...answers,
+      [currentActivity.id]: { answer, isCorrect, correctAnswer: currentActivity.correct }
+    }
     setAnswers(newAnswers)
     setFeedbackType(isCorrect)
     setShowFeedback(true)
 
+    const newScore = isCorrect ? score + 10 : score
     if (isCorrect) {
-      const newScore = score + 10
       setScore(newScore)
       toast.success(`✅ Correct! +10 XP`)
     } else {
@@ -168,24 +189,23 @@ const Activities = () => {
       if (currentIndex < activities.length - 1) {
         setCurrentIndex(currentIndex + 1)
       } else {
-        const finalScore = isCorrect ? score + 10 : score
-        finishActivities(finalScore, newAnswers)
+        finishActivities(newScore, newAnswers)
       }
     }, 2000)
   }
 
   const finishActivities = async (finalScore, finalAnswers) => {
     const saved = await saveProgress(finalScore, finalAnswers)
-    
     if (saved) {
-      setCompleted(true)
-      if (!previousProgress?.completed) {
+      setActivitiesCompleted(true)
+      const isFirstTime = !previousAnswers
+      if (isFirstTime) {
         toast.success(`🎉 Activities completed! You earned ${finalScore} XP!`)
       } else {
-        toast.success(`📝 Review saved! Your answers have been updated.`)
+        toast.success(`📝 Review saved! Score: ${finalScore} XP`)
       }
     } else {
-      setCompleted(true)
+      setActivitiesCompleted(true)
     }
   }
 
@@ -196,60 +216,87 @@ const Activities = () => {
       '⚠️ You will NOT earn XP again (already earned XP remains).\n\n' +
       'This is just for practice and review.'
     )
-    
     if (!confirmRetake) return
-    
-    // Resetar estado local
+
     setCurrentIndex(0)
     setAnswers({})
     setScore(0)
     setShowFeedback(false)
-    setCompleted(false)
-    
-    toast.success('🔄 Retake mode activated! Practice and improve your skills.', {
-      icon: '🔄',
-      duration: 4000
-    })
-    
+    setActivitiesCompleted(false)
+    toast.success('🔄 Retake mode! Practice and improve.', { icon: '🔄', duration: 3000 })
     navigate(`/activities/${lessonId}`)
   }
 
-  // Renderizar gabarito (modo results)
+  // ── Banner reutilizável ──────────────────────────────────────────────────
+  const renderBanner = (subtitle = 'Complete all exercises to earn XP') => (
+    <motion.div
+      initial={{ opacity: 0, y: -16 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="relative rounded-2xl overflow-hidden mb-8 h-36"
+      style={{ boxShadow: `0 0 28px ${theme.glow}` }}
+    >
+      <img src={bannerImage} alt="Activities"
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ filter: 'brightness(0.25) saturate(0.8)' }} />
+      <div className="absolute inset-0"
+        style={{ background: `linear-gradient(135deg, ${theme.color}20 0%, transparent 70%)` }} />
+      <div className="absolute inset-0 rounded-2xl" style={{ border: `1px solid ${theme.border}` }} />
+      <div className="absolute inset-0 flex flex-col justify-center px-8">
+        <Link to={`/lesson/${lessonId}`}
+          className="flex items-center gap-2 text-xs font-mono mb-2 w-fit px-3 py-1 rounded-lg"
+          style={{ color: theme.color, background: `${theme.color}18`, border: `1px solid ${theme.border}` }}>
+          <FaArrowLeft size={10} /> Back to Lesson
+        </Link>
+        <h2 className="text-2xl font-cyber font-bold"
+          style={{ color: theme.color, textShadow: `0 0 14px ${theme.glow}` }}>
+          🎯 Activities
+        </h2>
+        <p className="text-gray-400 text-sm">{subtitle}</p>
+      </div>
+    </motion.div>
+  )
+
+  // ── Gabarito (modo results) ─────────────────────────────────────────────
   const renderResults = () => {
+    const answersToShow = mode === 'results' ? userAnswers : answers
+    const scoreToShow = mode === 'results' ? previousScore : score
+    const total = activities.length * 10
+
     return (
       <div className="space-y-6">
-        <div className="bg-dark-200/50 rounded-lg p-4 mb-4 border border-neon-cyan/20">
+        {/* Resumo */}
+        <div className="rounded-lg p-4" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-cyber font-bold text-neon-cyan">📊 Results Summary</h3>
+            <h3 className="text-lg font-cyber font-bold" style={{ color: theme.color }}>
+              📊 Results Summary
+            </h3>
             <div className="text-right">
-              <span className="text-2xl font-bold text-neon-cyan">{score}</span>
-              <span className="text-gray-400"> / {activities.length * 10} XP</span>
+              <span className="text-2xl font-bold" style={{ color: theme.color }}>{scoreToShow}</span>
+              <span className="text-gray-400"> / {total} XP</span>
             </div>
           </div>
           <div className="h-2 bg-dark-300 rounded-full overflow-hidden mb-3">
-            <div 
-              className="h-full bg-gradient-to-r from-neon-cyan to-neon-pink rounded-full"
-              style={{ width: `${(score / (activities.length * 10)) * 100}%` }}
-            />
+            <div className="h-full rounded-full"
+              style={{ width: `${(scoreToShow / total) * 100}%`, background: `linear-gradient(90deg, ${theme.muted}, ${theme.color})` }} />
           </div>
           <p className="text-gray-400 text-sm">
-            {score === activities.length * 10 
-              ? '🎉 Perfect score! Excellent work!' 
-              : score >= activities.length * 7 
-                ? '👍 Good job! Keep practicing!' 
-                : '📚 Review the lesson and try again!'}
+            {scoreToShow === total ? '🎉 Perfect score! Excellent work!'
+              : scoreToShow >= total * 0.7 ? '👍 Good job! Keep practicing!'
+              : '📚 Review the lesson and try again!'}
           </p>
         </div>
 
+        {/* Respostas detalhadas */}
         <div className="space-y-4">
           <h3 className="text-lg font-cyber font-bold text-white">📝 Detailed Answers</h3>
-          {activities.map((activity, idx) => {
-            const userAnswer = userAnswers[activity.id]
+          {activities.map((activity) => {
+            const userAnswer = answersToShow[activity.id]
             const isCorrect = userAnswer?.isCorrect
             const userAnswerText = userAnswer?.answer || 'Not answered'
-            
+
             return (
-              <div key={activity.id} className={`glass-card p-4 ${isCorrect ? 'border-green-500/50' : 'border-red-500/50'}`}>
+              <div key={activity.id} className="glass-card p-4"
+                style={{ borderColor: isCorrect ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)' }}>
                 <div className="flex items-start gap-3">
                   <div className={`mt-1 ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
                     {isCorrect ? <FaCheck size={18} /> : <FaTimes size={18} />}
@@ -259,17 +306,16 @@ const Activities = () => {
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div>
                         <span className="text-gray-400">Your answer:</span>
-                        <p className={`${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
-                          {userAnswerText}
-                        </p>
+                        <p className={isCorrect ? 'text-green-500' : 'text-red-500'}>{userAnswerText}</p>
                       </div>
                       <div>
                         <span className="text-gray-400">Correct answer:</span>
-                        <p className="text-neon-cyan">{activity.correct}</p>
+                        <p style={{ color: theme.color }}>{activity.correct}</p>
                       </div>
                     </div>
                     {!isCorrect && (
-                      <p className="text-xs text-gray-400 mt-2 border-t border-neon-cyan/20 pt-2">
+                      <p className="text-xs text-gray-400 mt-2 pt-2"
+                        style={{ borderTop: `1px solid ${theme.border}` }}>
                         💡 {activity.explanation}
                       </p>
                     )}
@@ -280,16 +326,14 @@ const Activities = () => {
           })}
         </div>
 
-        <div className="flex gap-4 justify-center pt-4">
-          <Link to={`/module/${Math.ceil(parseInt(lessonId) / 2)}`}>
+        <div className="flex gap-4 justify-center pt-4 flex-wrap">
+          <Link to={`/module/${moduleId}`}>
             <button className="cyber-button flex items-center gap-2">
               <FaArrowLeft /> Back to Module
             </button>
           </Link>
-          <button
-            onClick={handleRetake}
-            className="px-6 py-3 bg-yellow-500/20 border border-yellow-500 text-yellow-500 rounded-lg hover:shadow-yellow-500/50 transition-all flex items-center gap-2"
-          >
+          <button onClick={handleRetake}
+            className="px-6 py-3 bg-yellow-500/20 border border-yellow-500 text-yellow-500 rounded-lg hover:bg-yellow-500/30 transition-all flex items-center gap-2">
             <FaRedoAlt /> Retake Activities
           </button>
         </div>
@@ -297,6 +341,7 @@ const Activities = () => {
     )
   }
 
+  // ── Renderiza questão atual ─────────────────────────────────────────────
   const renderActivity = () => {
     if (activities.length === 0 || !activities[currentIndex]) {
       return (
@@ -305,91 +350,72 @@ const Activities = () => {
         </div>
       )
     }
-    
+
     const activity = activities[currentIndex]
     const instructions = activityInstructions[activity.type]
-    
+
+    const instructionBox = (
+      <div className="rounded-lg p-3 mb-4" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
+        <div className="flex items-center gap-2 mb-1" style={{ color: theme.color }}>
+          <FaInfoCircle size={14} />
+          <span className="text-sm font-mono">{instructions.title}</span>
+        </div>
+        <p className="text-gray-400 text-sm">{instructions.description}</p>
+        <div className="flex items-center gap-2 mt-2 text-yellow-500 text-xs">
+          <FaLightbulb size={12} />
+          <span>{activity.hint || instructions.tip}</span>
+        </div>
+      </div>
+    )
+
     if (activity.type === 'multiple_choice') {
       return (
         <div className="space-y-4">
-          <div className="bg-dark-200/50 rounded-lg p-3 mb-4 border border-neon-cyan/20">
-            <div className="flex items-center gap-2 text-neon-cyan mb-1">
-              <FaInfoCircle size={14} />
-              <span className="text-sm font-mono">{instructions.title}</span>
-            </div>
-            <p className="text-gray-400 text-sm">{instructions.description}</p>
-            <div className="flex items-center gap-2 mt-2 text-yellow-500 text-xs">
-              <FaLightbulb size={12} />
-              <span>{activity.hint || instructions.tip}</span>
-            </div>
-          </div>
-          
+          {instructionBox}
           <p className="text-xl text-white mb-6">{activity.question}</p>
           <div className="grid gap-3">
             {activity.options.map((option, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleAnswer(option)}
-                disabled={mode === 'results'}
-                className="p-4 bg-dark-200 border border-neon-cyan/30 rounded-lg hover:border-neon-cyan hover:shadow-neon transition-all text-left text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <button key={idx} onClick={() => handleAnswer(option)}
+                className="p-4 bg-dark-200 border border-neon-cyan/30 rounded-lg hover:border-neon-cyan hover:shadow-neon transition-all text-left text-white">
                 {option}
               </button>
             ))}
           </div>
         </div>
       )
-    } else if (activity.type === 'fill_blank') {
+    }
+
+    if (activity.type === 'fill_blank') {
       const parts = activity.question.split('____')
-      const before = parts[0] || ''
-      const after = parts[1] || ''
-      
       return (
         <div className="space-y-4">
-          <div className="bg-dark-200/50 rounded-lg p-3 mb-4 border border-neon-cyan/20">
-            <div className="flex items-center gap-2 text-neon-cyan mb-1">
-              <FaInfoCircle size={14} />
-              <span className="text-sm font-mono">{instructions.title}</span>
-            </div>
-            <p className="text-gray-400 text-sm">{instructions.description}</p>
-            <div className="flex items-center gap-2 mt-2 text-yellow-500 text-xs">
-              <FaLightbulb size={12} />
-              <span>{activity.hint || instructions.tip}</span>
-            </div>
-          </div>
-          
+          {instructionBox}
           <p className="text-xl text-white mb-6">
-            {before}
+            {parts[0]}
             <input
               type="text"
               id="fillAnswer"
-              disabled={mode === 'results'}
-              className="mx-2 px-3 py-1 bg-dark-300 border border-neon-cyan rounded-lg focus:outline-none text-neon-cyan text-center disabled:opacity-50"
-              placeholder={activity.placeholder || "______"}
+              className="mx-2 px-3 py-1 bg-dark-300 rounded-lg focus:outline-none text-center"
+              style={{ border: `1px solid ${theme.border}`, color: theme.color }}
+              placeholder="______"
               onKeyPress={(e) => {
-                if (e.key === 'Enter' && mode !== 'results') {
+                if (e.key === 'Enter') {
                   const input = document.getElementById('fillAnswer')
-                  if (input.value.trim()) {
-                    handleAnswer(input.value)
-                  }
+                  if (input?.value.trim()) handleAnswer(input.value)
                 }
               }}
             />
-            {after}
+            {parts[1]}
           </p>
           <div className="flex justify-center">
             <button
               onClick={() => {
-                if (mode === 'results') return
                 const input = document.getElementById('fillAnswer')
-                if (!input.value.trim()) {
-                  toast.error('Please type your answer first!')
-                  return
-                }
+                if (!input?.value.trim()) { toast.error('Please type your answer first!'); return }
                 handleAnswer(input.value)
               }}
-              disabled={mode === 'results'}
-              className="cyber-button px-8 disabled:opacity-50"
+              style={{ color: theme.color, border: `1px solid ${theme.border}`, background: `${theme.color}18` }}
+              className="px-8 py-3 rounded-lg font-mono transition-all hover:brightness-125"
             >
               Check Answer
             </button>
@@ -397,142 +423,134 @@ const Activities = () => {
         </div>
       )
     }
-    
+
     return null
   }
 
-  // MODO RESULTADOS - Mostra gabarito
-  if (mode === 'results' && previousProgress?.completed) {
+  // ── Modo resultados (via ?mode=results) ────────────────────────────────
+  if (mode === 'results') {
+    if (loading) return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-neon-cyan text-xl">Loading results...</div>
+      </div>
+    )
     return (
-      <div className="min-h-screen flex items-center justify-center py-12 px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card p-8 max-w-3xl w-full"
-        >
-          <div className="mb-6 pb-4 border-b border-neon-cyan/30">
-            <h2 className="text-2xl font-cyber font-bold text-neon-cyan mb-1">
-              📊 Activity Results
-            </h2>
-            <p className="text-gray-400">Review your answers and see what you got right</p>
-          </div>
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
+        {renderBanner('Review your answers and see what you got right')}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl p-8"
+          style={{ background: theme.bg, border: `1px solid ${theme.border}`, boxShadow: `0 0 20px ${theme.glow}` }}>
           {renderResults()}
         </motion.div>
       </div>
     )
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-neon-cyan text-xl">Loading activities...</div>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-neon-cyan text-xl">Loading activities...</div>
+    </div>
+  )
 
-  if (completed && mode !== 'results') {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="glass-card p-12 text-center"
-        >
-          <FaTrophy className="text-6xl text-yellow-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Activities Completed! 🎉</h2>
-          <p className="text-gray-400 mb-4">You earned {score} XP from this lesson</p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Link to="/dashboard">
-              <button className="cyber-button">Back to Dashboard</button>
-            </Link>
-            <Link to={`/module/${Math.ceil(parseInt(lessonId) / 2)}`}>
-              <button className="px-6 py-3 bg-dark-200 border border-neon-pink text-neon-pink rounded-lg hover:shadow-neon-pink transition-all">
-                Continue Learning
-              </button>
-            </Link>
-            <button
-              onClick={handleRetake}
-              className="px-6 py-3 bg-yellow-500/20 border border-yellow-500 text-yellow-500 rounded-lg hover:shadow-yellow-500/50 transition-all flex items-center gap-2"
-            >
-              <FaRedoAlt /> Retake (Practice)
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    )
-  }
-
-  if (activities.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="glass-card p-12 text-center">
-          <h2 className="text-2xl text-white mb-4">No activities found</h2>
-          <p className="text-gray-400 mb-6">Exercises for this lesson are being prepared.</p>
+  // ── Tela de conclusão das atividades ───────────────────────────────────
+  if (activitiesCompleted) return (
+    <div className="flex items-center justify-center min-h-screen px-4">
+      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+        className="rounded-xl p-12 text-center max-w-lg w-full"
+        style={{ background: theme.bg, border: `1px solid ${theme.border}`, boxShadow: `0 0 40px ${theme.glow}` }}>
+        <FaTrophy className="text-6xl text-yellow-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-white mb-2">Activities Completed! 🎉</h2>
+        <p className="text-gray-400 mb-2">
+          Score: <span style={{ color: theme.color }} className="font-bold text-xl">{score} XP</span>
+        </p>
+        <p className="text-gray-500 text-sm mb-6">
+          {score === activities.length * 10
+            ? '🌟 Perfect score!'
+            : score >= activities.length * 7
+            ? '👍 Great job!'
+            : '📚 Review the lesson and try again!'}
+        </p>
+        <div className="flex gap-3 justify-center flex-wrap">
           <Link to="/dashboard">
             <button className="cyber-button">Back to Dashboard</button>
           </Link>
+          <Link to={`/module/${moduleId}`}>
+            <button style={{ color: theme.color, border: `1px solid ${theme.border}`, background: `${theme.color}18` }}
+              className="px-6 py-3 rounded-lg transition-all hover:brightness-125 font-mono">
+              Continue Learning
+            </button>
+          </Link>
+          <button onClick={handleRetake}
+            className="px-6 py-3 bg-yellow-500/20 border border-yellow-500 text-yellow-500 rounded-lg transition-all flex items-center gap-2 hover:bg-yellow-500/30">
+            <FaRedoAlt /> Retake
+          </button>
         </div>
-      </div>
-    )
-  }
+      </motion.div>
+    </div>
+  )
 
+  if (activities.length === 0) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="glass-card p-12 text-center">
+        <h2 className="text-2xl text-white mb-4">No activities found</h2>
+        <p className="text-gray-400 mb-6">Exercises for this lesson are being prepared.</p>
+        <Link to="/dashboard"><button className="cyber-button">Back to Dashboard</button></Link>
+      </div>
+    </div>
+  )
+
+  // ── Tela principal das atividades ──────────────────────────────────────
   const currentActivity = activities[currentIndex]
   const instructions = activityInstructions[currentActivity?.type]
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass-card p-8 max-w-2xl w-full"
-      >
-        <div className="mb-6 pb-4 border-b border-neon-cyan/30">
-          <h2 className="text-xl font-cyber font-bold text-neon-cyan mb-1">
-            {instructions?.title || "Activity"}
-          </h2>
-          <p className="text-gray-400 text-sm">
-            {instructions?.description || "Complete the exercise below"}
-          </p>
-        </div>
+    <div className="min-h-screen py-8 px-4">
+      <div className="max-w-2xl mx-auto">
+        {renderBanner()}
 
-        <div className="mb-8">
-          <div className="flex justify-between text-sm text-gray-400 mb-2">
-            <span>Activity {currentIndex + 1} of {activities.length}</span>
-            <span>Score: {score} XP</span>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl p-8"
+          style={{ background: theme.bg, border: `1px solid ${theme.border}`, boxShadow: `0 0 24px ${theme.glow}` }}>
+
+          {/* Cabeçalho */}
+          <div className="mb-6 pb-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
+            <h2 className="text-xl font-cyber font-bold mb-1" style={{ color: theme.color }}>
+              {instructions?.title || 'Activity'}
+            </h2>
+            <p className="text-gray-400 text-sm">{instructions?.description || 'Complete the exercise below'}</p>
           </div>
-          <div className="h-2 bg-dark-300 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-neon-cyan to-neon-pink transition-all duration-300"
-              style={{ width: `${((currentIndex + 1) / activities.length) * 100}%` }}
-            />
+
+          {/* Barra de progresso das questões */}
+          <div className="mb-8">
+            <div className="flex justify-between text-sm text-gray-400 mb-2">
+              <span>Activity {currentIndex + 1} of {activities.length}</span>
+              <span style={{ color: theme.color }}>Score: {score} XP</span>
+            </div>
+            <div className="h-2 bg-dark-300 rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${((currentIndex) / activities.length) * 100}%`,
+                  background: `linear-gradient(90deg, ${theme.muted}, ${theme.color})`
+                }} />
+            </div>
           </div>
-        </div>
 
-        <div className="min-h-[350px]">
-          {renderActivity()}
-        </div>
+          {/* Questão */}
+          <div className="min-h-[350px]">{renderActivity()}</div>
 
-        {showFeedback && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className={`mt-6 p-4 rounded-lg text-center ${
-              feedbackType ? 'bg-green-500/20 border border-green-500' : 'bg-red-500/20 border border-red-500'
-            }`}
-          >
-            {feedbackType ? (
-              <div className="text-green-500 flex items-center justify-center gap-2">
-                <FaCheck /> Correct! Well done!
-              </div>
-            ) : (
-              <div className="text-red-500 flex items-center justify-center gap-2">
-                <FaTimes /> Try again! Check the hint above.
-              </div>
-            )}
-          </motion.div>
-        )}
-      </motion.div>
+          {/* Feedback */}
+          {showFeedback && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              className={`mt-6 p-4 rounded-lg text-center ${
+                feedbackType ? 'bg-green-500/20 border border-green-500' : 'bg-red-500/20 border border-red-500'
+              }`}>
+              {feedbackType
+                ? <div className="text-green-500 flex items-center justify-center gap-2"><FaCheck /> Correct! Well done!</div>
+                : <div className="text-red-500 flex items-center justify-center gap-2"><FaTimes /> Incorrect! Check the hint above.</div>}
+            </motion.div>
+          )}
+        </motion.div>
+      </div>
     </div>
   )
 }

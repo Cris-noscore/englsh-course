@@ -20,7 +20,17 @@ export default {
           300: '#0f172a',
           400: '#0a0f1f',
           500: '#05070f',
-        }
+        },
+        // Temas por módulo — usados via CSS variables, mas declarados aqui
+        // para que o Tailwind não purgue as classes de referência
+        module: {
+          '1': '#00b4d8', // Azul
+          '2': '#f5c400', // Amarelo
+          '3': '#22c55e', // Verde
+          '4': '#f97316', // Laranja
+          '5': '#a855f7', // Roxo
+          '6': '#94a3b8', // Cinza
+        },
       },
       fontFamily: {
         'mono': ['Fira Code', 'monospace'],

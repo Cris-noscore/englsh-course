@@ -14,7 +14,7 @@ import Header from './components/Layout/Header'
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
-  
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -22,43 +22,48 @@ const ProtectedRoute = ({ children }) => {
       </div>
     )
   }
-  
+
   if (!user) {
     return <Navigate to="/login" />
   }
-  
+
   return children
 }
 
 function AppRoutes() {
   const { user } = useAuth()
-  
+
   return (
-    <Routes>
-      <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Landing />} />
-      <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
-      <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
-      <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
-      } />
-      <Route path="/module/:moduleId" element={
-        <ProtectedRoute>
-          <Module />
-        </ProtectedRoute>
-      } />
-      <Route path="/lesson/:lessonId" element={
-        <ProtectedRoute>
-          <Lesson />
-        </ProtectedRoute>
-      } />
-      <Route path="/activities/:lessonId" element={
-        <ProtectedRoute>
-          <Activities />
-        </ProtectedRoute>
-      } />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Landing />} />
+        <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+        <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/module/:moduleId" element={
+          <ProtectedRoute>
+            <Module />
+          </ProtectedRoute>
+        } />
+        <Route path="/lesson/:lessonId" element={
+          <ProtectedRoute>
+            <Lesson />
+          </ProtectedRoute>
+        } />
+        <Route path="/activities/:lessonId" element={
+          <ProtectedRoute>
+            <Activities />
+          </ProtectedRoute>
+        } />
+      </Routes>
+
+      {/* AIChat só aparece para usuários logados */}
+      {user && <AIChat />}
+    </>
   )
 }
 
@@ -71,8 +76,7 @@ function App() {
           <main className="pt-20">
             <AppRoutes />
           </main>
-          <AIChat />
-          <Toaster 
+          <Toaster
             position="top-right"
             toastOptions={{
               style: {

@@ -127,11 +127,13 @@ const StudentTools = () => {
   }
 
   const speak = (text) => {
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'en-US'
-    utterance.rate = 0.9
-    window.speechSynthesis.speak(utterance)
-  }
+  if (typeof window === 'undefined' || !window.speechSynthesis) return
+  window.speechSynthesis.cancel()
+  const utterance = new window.SpeechSynthesisUtterance(text)
+  utterance.lang = 'en-US'
+  utterance.rate = 0.9
+  window.speechSynthesis.speak(utterance)
+}
 
   const vocabularyByModule = {
   1: [

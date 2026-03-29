@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FaCheck, FaTimes, FaTrophy, FaInfoCircle, FaLightbulb, FaArrowLeft, FaRedoAlt } from 'react-icons/fa'
+import { FaCheck, FaTimes, FaTrophy, FaInfoCircle, FaLightbulb, FaArrowLeft, FaArrowRight, FaRedoAlt } from 'react-icons/fa'
 import toast from 'react-hot-toast'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -18,6 +18,9 @@ const MODULE_THEME = {
 }
 
 const LESSON_MODULE_MAP = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 5, 7: 5, 8: 5, 9: 6 }
+
+// Próxima aula de cada lição (null = última aula do curso)
+const NEXT_LESSON_MAP = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: null }
 
 const LESSON_IMAGES = {
   1: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=1200&q=80',
@@ -39,9 +42,12 @@ const Activities = () => {
   const moduleId = LESSON_MODULE_MAP[parseInt(lessonId)] || 1
   const theme = MODULE_THEME[moduleId]
   const bannerImage = LESSON_IMAGES[parseInt(lessonId)] || LESSON_IMAGES[1]
+  const nextLessonId = NEXT_LESSON_MAP[parseInt(lessonId)]
+  const nextModuleId = nextLessonId ? LESSON_MODULE_MAP[nextLessonId] : null
+  const isLastLesson = !nextLessonId
 
   const searchParams = new URLSearchParams(window.location.search)
-  const mode = searchParams.get('mode') // 'results' ou null
+  const mode = searchParams.get('mode')
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState({})
@@ -49,12 +55,7 @@ const Activities = () => {
   const [showFeedback, setShowFeedback] = useState(false)
   const [feedbackType, setFeedbackType] = useState(null)
   const [score, setScore] = useState(0)
-
-  // ─── FIX: "activitiesCompleted" é separado de "lessonCompleted" ─────────
-  // A lesson marca completed=true no banco para liberar o módulo seguinte.
-  // Mas as atividades precisam de um estado LOCAL independente.
   const [activitiesCompleted, setActivitiesCompleted] = useState(false)
-
   const [loading, setLoading] = useState(true)
   const [activities, setActivities] = useState([])
   const [previousAnswers, setPreviousAnswers] = useState(null)
@@ -103,15 +104,11 @@ const Activities = () => {
       if (data) {
         setPreviousScore(data.score || 0)
         setPreviousAnswers(data.answers || null)
-
-        // ─── FIX: só mostra "completed" se estiver no modo results ─────
-        // Em modo normal (vindo da lesson), sempre começa do zero
         if (mode === 'results') {
           setScore(data.score || 0)
           setUserAnswers(data.answers || {})
           setActivitiesCompleted(true)
         }
-        // Em modo normal, não seta activitiesCompleted — deixa o aluno jogar
       }
     } catch (error) {
       console.error('Error checking progress:', error)
@@ -135,7 +132,6 @@ const Activities = () => {
 
       if (progressError) throw progressError
 
-      // Só adiciona XP se for a primeira vez completando as atividades
       const isFirstTime = !previousAnswers
       if (isFirstTime && finalScore > 0) {
         const newXP = (profile?.xp || 0) + finalScore
@@ -227,7 +223,7 @@ const Activities = () => {
     navigate(`/activities/${lessonId}`)
   }
 
-  // ── Banner reutilizável ──────────────────────────────────────────────────
+  // ── Banner ───────────────────────────────────────────────────────────────
   const renderBanner = (subtitle = 'Complete all exercises to earn XP') => (
     <motion.div
       initial={{ opacity: 0, y: -16 }}
@@ -256,7 +252,7 @@ const Activities = () => {
     </motion.div>
   )
 
-  // ── Gabarito (modo results) ─────────────────────────────────────────────
+  // ── Gabarito ─────────────────────────────────────────────────────────────
   const renderResults = () => {
     const answersToShow = mode === 'results' ? userAnswers : answers
     const scoreToShow = mode === 'results' ? previousScore : score
@@ -264,7 +260,6 @@ const Activities = () => {
 
     return (
       <div className="space-y-6">
-        {/* Resumo */}
         <div className="rounded-lg p-4" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-cyber font-bold" style={{ color: theme.color }}>
@@ -286,14 +281,12 @@ const Activities = () => {
           </p>
         </div>
 
-        {/* Respostas detalhadas */}
         <div className="space-y-4">
           <h3 className="text-lg font-cyber font-bold text-white">📝 Detailed Answers</h3>
           {activities.map((activity) => {
             const userAnswer = answersToShow[activity.id]
             const isCorrect = userAnswer?.isCorrect
             const userAnswerText = userAnswer?.answer || 'Not answered'
-
             return (
               <div key={activity.id} className="glass-card p-4"
                 style={{ borderColor: isCorrect ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)' }}>
@@ -341,7 +334,7 @@ const Activities = () => {
     )
   }
 
-  // ── Renderiza questão atual ─────────────────────────────────────────────
+  // ── Questão atual ────────────────────────────────────────────────────────
   const renderActivity = () => {
     if (activities.length === 0 || !activities[currentIndex]) {
       return (
@@ -427,7 +420,7 @@ const Activities = () => {
     return null
   }
 
-  // ── Modo resultados (via ?mode=results) ────────────────────────────────
+  // ── Modo resultados ───────────────────────────────────────────────────────
   if (mode === 'results') {
     if (loading) return (
       <div className="flex items-center justify-center min-h-screen">
@@ -452,42 +445,88 @@ const Activities = () => {
     </div>
   )
 
-  // ── Tela de conclusão das atividades ───────────────────────────────────
-  if (activitiesCompleted) return (
-    <div className="flex items-center justify-center min-h-screen px-4">
-      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
-        className="rounded-xl p-12 text-center max-w-lg w-full"
-        style={{ background: theme.bg, border: `1px solid ${theme.border}`, boxShadow: `0 0 40px ${theme.glow}` }}>
-        <FaTrophy className="text-6xl text-yellow-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-white mb-2">Activities Completed! 🎉</h2>
-        <p className="text-gray-400 mb-2">
-          Score: <span style={{ color: theme.color }} className="font-bold text-xl">{score} XP</span>
-        </p>
-        <p className="text-gray-500 text-sm mb-6">
-          {score === activities.length * 10
-            ? '🌟 Perfect score!'
-            : score >= activities.length * 7
-            ? '👍 Great job!'
-            : '📚 Review the lesson and try again!'}
-        </p>
-        <div className="flex gap-3 justify-center flex-wrap">
-          <Link to="/dashboard">
-            <button className="cyber-button">Back to Dashboard</button>
-          </Link>
-          <Link to={`/module/${moduleId}`}>
-            <button style={{ color: theme.color, border: `1px solid ${theme.border}`, background: `${theme.color}18` }}
-              className="px-6 py-3 rounded-lg transition-all hover:brightness-125 font-mono">
-              Continue Learning
-            </button>
-          </Link>
-          <button onClick={handleRetake}
-            className="px-6 py-3 bg-yellow-500/20 border border-yellow-500 text-yellow-500 rounded-lg transition-all flex items-center gap-2 hover:bg-yellow-500/30">
-            <FaRedoAlt /> Retake
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  )
+  // ── Tela de conclusão ─────────────────────────────────────────────────────
+  if (activitiesCompleted) {
+    const nextTheme = nextModuleId ? MODULE_THEME[nextModuleId] : null
+
+    return (
+      <div className="flex items-center justify-center min-h-screen px-4">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="rounded-xl p-10 text-center max-w-lg w-full"
+          style={{ background: theme.bg, border: `1px solid ${theme.border}`, boxShadow: `0 0 40px ${theme.glow}` }}
+        >
+          <FaTrophy className="text-6xl text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Activities Completed! 🎉</h2>
+          <p className="text-gray-400 mb-1">
+            Score: <span style={{ color: theme.color }} className="font-bold text-xl">{score} XP</span>
+          </p>
+          <p className="text-gray-500 text-sm mb-8">
+            {score === activities.length * 10
+              ? '🌟 Perfect score!'
+              : score >= activities.length * 7
+              ? '👍 Great job!'
+              : '📚 Review the lesson and try again!'}
+          </p>
+
+          <div className="space-y-3">
+            {/* Botão PRÓXIMA AULA — destaque principal */}
+            {nextLessonId ? (
+              <Link to={`/lesson/${nextLessonId}`} className="block">
+                <button
+                  style={{
+                    color: nextTheme?.color || theme.color,
+                    border: `2px solid ${nextTheme?.color || theme.color}`,
+                    background: `${nextTheme?.color || theme.color}18`,
+                    boxShadow: `0 0 16px ${nextTheme?.glow || theme.glow}`,
+                  }}
+                  className="w-full py-4 rounded-xl font-cyber font-bold text-lg flex items-center justify-center gap-3 transition-all hover:brightness-125"
+                >
+                  <FaArrowRight />
+                  Next Lesson →
+                </button>
+              </Link>
+            ) : (
+              /* Última aula — mensagem de parabéns */
+              <div
+                className="w-full py-4 rounded-xl text-center"
+                style={{ background: `${theme.color}18`, border: `2px solid ${theme.color}` }}
+              >
+                <p className="text-lg font-cyber font-bold" style={{ color: theme.color }}>
+                  🎓 Course Completed!
+                </p>
+                <p className="text-gray-400 text-sm mt-1">You've finished all lessons!</p>
+              </div>
+            )}
+
+            {/* Botões secundários */}
+            <div className="flex gap-3 justify-center flex-wrap pt-2">
+              <Link to="/dashboard">
+                <button className="cyber-button text-sm px-4 py-2">
+                  Dashboard
+                </button>
+              </Link>
+              <Link to={`/module/${moduleId}`}>
+                <button
+                  style={{ color: theme.color, border: `1px solid ${theme.border}`, background: `${theme.color}18` }}
+                  className="text-sm px-4 py-2 rounded-lg transition-all hover:brightness-125 font-mono"
+                >
+                  Module
+                </button>
+              </Link>
+              <button
+                onClick={handleRetake}
+                className="text-sm px-4 py-2 bg-yellow-500/20 border border-yellow-500 text-yellow-500 rounded-lg transition-all flex items-center gap-2 hover:bg-yellow-500/30"
+              >
+                <FaRedoAlt size={12} /> Retake
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
 
   if (activities.length === 0) return (
     <div className="flex items-center justify-center min-h-screen">
@@ -499,7 +538,7 @@ const Activities = () => {
     </div>
   )
 
-  // ── Tela principal das atividades ──────────────────────────────────────
+  // ── Tela principal das atividades ─────────────────────────────────────────
   const currentActivity = activities[currentIndex]
   const instructions = activityInstructions[currentActivity?.type]
 
@@ -512,7 +551,6 @@ const Activities = () => {
           className="rounded-xl p-8"
           style={{ background: theme.bg, border: `1px solid ${theme.border}`, boxShadow: `0 0 24px ${theme.glow}` }}>
 
-          {/* Cabeçalho */}
           <div className="mb-6 pb-4" style={{ borderBottom: `1px solid ${theme.border}` }}>
             <h2 className="text-xl font-cyber font-bold mb-1" style={{ color: theme.color }}>
               {instructions?.title || 'Activity'}
@@ -520,7 +558,6 @@ const Activities = () => {
             <p className="text-gray-400 text-sm">{instructions?.description || 'Complete the exercise below'}</p>
           </div>
 
-          {/* Barra de progresso das questões */}
           <div className="mb-8">
             <div className="flex justify-between text-sm text-gray-400 mb-2">
               <span>Activity {currentIndex + 1} of {activities.length}</span>
@@ -535,10 +572,8 @@ const Activities = () => {
             </div>
           </div>
 
-          {/* Questão */}
           <div className="min-h-[350px]">{renderActivity()}</div>
 
-          {/* Feedback */}
           {showFeedback && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               className={`mt-6 p-4 rounded-lg text-center ${

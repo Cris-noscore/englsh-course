@@ -12,6 +12,7 @@ import Lesson from './pages/Lesson'
 import Activities from './pages/Activities'
 import Header from './components/Layout/Header'
 import Profile from './pages/Profile'
+import Certificate from './pages/Certificate'
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -43,6 +44,11 @@ function AppRoutes() {
         <Route path="/profile" element={
   <ProtectedRoute>
     <Profile />
+  </ProtectedRoute>
+} />
+<Route path="/certificate" element={
+  <ProtectedRoute>
+    <Certificate />
   </ProtectedRoute>
 } />
         <Route path="/dashboard" element={

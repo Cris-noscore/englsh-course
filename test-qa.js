@@ -47,12 +47,8 @@ function ok(msg)   { console.log(`   ${c.green}✅ ${msg}${c.reset}`);    passed
 function fail(msg) { console.log(`   ${c.red}❌ ${msg}${c.reset}`);      failed++   }
 function warn(msg) { console.log(`   ${c.yellow}⚠️  ${msg}${c.reset}`);  warnings++ }
 function info(msg) { console.log(`   ${c.cyan}ℹ️  ${msg}${c.reset}`)               }
-function section(title) {
-  console.log(`\n${c.blue}${c.bold}${title}${c.reset}`)
-}
-function divider() {
-  console.log('─'.repeat(60))
-}
+function section(title) { console.log(`\n${c.blue}${c.bold}${title}${c.reset}`) }
+function divider() { console.log('─'.repeat(60)) }
 
 // ─── INÍCIO ──────────────────────────────────────────────────────────────────
 async function runTests() {
@@ -66,17 +62,13 @@ async function runTests() {
   console.log(`\n${c.bold}[ BLOCO 1 — INFRAESTRUTURA ]${c.reset}`)
   divider()
 
-  // Teste 1: Conexão com Supabase
   section('📡 Teste 1: Conexão com Supabase')
   try {
     const { error } = await supabase.from('profiles').select('count').limit(1)
     if (error) throw error
     ok('Conexão estabelecida com sucesso')
-  } catch (e) {
-    fail(`Falha na conexão: ${e.message}`)
-  }
+  } catch (e) { fail(`Falha na conexão: ${e.message}`) }
 
-  // Teste 2: Tabelas necessárias existem
   section('📊 Teste 2: Tabelas obrigatórias')
   for (const table of ['profiles', 'user_progress']) {
     const { error } = await supabase.from(table).select('count').limit(1)
@@ -84,17 +76,9 @@ async function runTests() {
     else       ok(`Tabela "${table}" existe`)
   }
 
-  // Teste 3: Colunas do user_progress
   section('📋 Teste 3: Colunas de user_progress')
-  const requiredCols = [
-    'id', 'user_id', 'lesson_id', 'completed',
-    'score', 'video_watched', 'content_read', 'answers', 'updated_at'
-  ]
-  const { error: colError } = await supabase
-    .from('user_progress')
-    .select(requiredCols.join(','))
-    .limit(1)
-
+  const requiredCols = ['id','user_id','lesson_id','completed','score','video_watched','content_read','answers','updated_at']
+  const { error: colError } = await supabase.from('user_progress').select(requiredCols.join(',')).limit(1)
   if (colError) fail(`Colunas ausentes: ${colError.message}`)
   else          ok(`Todas as ${requiredCols.length} colunas encontradas`)
 
@@ -104,37 +88,26 @@ async function runTests() {
   console.log(`\n${c.bold}[ BLOCO 2 — DADOS ]${c.reset}`)
   divider()
 
-  // Teste 4: Usuários cadastrados
   section('👥 Teste 4: Usuários cadastrados')
-  const { data: users, error: usersError } = await supabase
-    .from('profiles')
-    .select('id, username, xp, level')
-
+  const { data: users, error: usersError } = await supabase.from('profiles').select('id, username, xp, level')
   if (usersError) {
     fail(`Erro ao buscar usuários: ${usersError.message}`)
   } else {
     ok(`${users.length} usuário(s) encontrado(s)`)
-    users.forEach(u =>
-      info(`${u.username || '(sem nome)'} — XP: ${u.xp || 0} | Level: ${u.level || 1}`)
-    )
+    users.forEach(u => info(`${u.username || '(sem nome)'} — XP: ${u.xp || 0} | Level: ${u.level || 1}`))
     if (users.length === 0) warn('Nenhum usuário cadastrado ainda')
   }
 
-  // Teste 5: Progresso geral dos usuários
   section('📈 Teste 5: Registros de progresso')
   const { data: progress, error: progError } = await supabase
-    .from('user_progress')
-    .select('user_id, lesson_id, completed, score, video_watched, content_read, answers')
-
+    .from('user_progress').select('user_id, lesson_id, completed, score, video_watched, content_read, answers')
   if (progError) {
     fail(`Erro ao buscar progresso: ${progError.message}`)
   } else {
     ok(`${progress.length} registro(s) de progresso encontrado(s)`)
-    const completedCount = progress.filter(p => p.completed).length
-    info(`${completedCount} aula(s) marcada(s) como concluída(s)`)
+    info(`${progress.filter(p => p.completed).length} aula(s) marcada(s) como concluída(s)`)
   }
 
-  // Teste 6: Módulos do curso
   section('📚 Teste 6: Dados dos módulos (courseData.js)')
   try {
     const { modules } = await import('./src/utils/courseData.js')
@@ -144,52 +117,29 @@ async function runTests() {
       let totalLessons = 0
       modules.forEach(m => { if (m.lessons) totalLessons += m.lessons.length })
       ok(`${modules.length} módulos carregados com ${totalLessons} aulas no total`)
-
-      // Verifica se todos os módulos têm os campos obrigatórios
       const invalid = modules.filter(m => !m.id || !m.title || !m.lessons)
-      if (invalid.length > 0)
-        warn(`${invalid.length} módulo(s) com campos obrigatórios ausentes`)
-      else
-        ok('Todos os módulos têm id, title e lessons')
+      if (invalid.length > 0) warn(`${invalid.length} módulo(s) com campos obrigatórios ausentes`)
+      else ok('Todos os módulos têm id, title e lessons')
     }
-  } catch (e) {
-    fail(`Erro ao importar courseData.js: ${e.message}`)
-  }
+  } catch (e) { fail(`Erro ao importar courseData.js: ${e.message}`) }
 
-  // Teste 7: Exercícios
   section('📝 Teste 7: Dados dos exercícios (exercisesData.js)')
   try {
     const { exercisesByModule, getExercisesByLesson } = await import('./src/utils/exercisesData.js')
     const moduleKeys = Object.keys(exercisesByModule)
     let totalExercises = 0
     let emptyModules = []
-
     moduleKeys.forEach(key => {
       const count = exercisesByModule[key]?.exercises?.length || 0
       totalExercises += count
       if (count === 0) emptyModules.push(key)
     })
-
     ok(`${moduleKeys.length} módulos com exercícios — ${totalExercises} questões no total`)
-
-    if (emptyModules.length > 0)
-      warn(`Módulos sem exercícios: ${emptyModules.join(', ')}`)
-
-    // Verifica se todas as 9 lessons têm exercícios mapeados
-    const lessonIds = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    const missingLessons = []
-    lessonIds.forEach(id => {
-      const result = getExercisesByLesson(id)
-      if (!result?.exercises?.length) missingLessons.push(id)
-    })
-    if (missingLessons.length > 0)
-      warn(`Lessons sem exercícios mapeados: ${missingLessons.join(', ')}`)
-    else
-      ok('Todas as 9 lessons têm exercícios mapeados')
-
-  } catch (e) {
-    fail(`Erro ao importar exercisesData.js: ${e.message}`)
-  }
+    if (emptyModules.length > 0) warn(`Módulos sem exercícios: ${emptyModules.join(', ')}`)
+    const missingLessons = [1,2,3,4,5,6,7,8,9].filter(id => !getExercisesByLesson(id)?.exercises?.length)
+    if (missingLessons.length > 0) warn(`Lessons sem exercícios mapeados: ${missingLessons.join(', ')}`)
+    else ok('Todas as 9 lessons têm exercícios mapeados')
+  } catch (e) { fail(`Erro ao importar exercisesData.js: ${e.message}`) }
 
   // ══════════════════════════════════════════════════════════════
   // BLOCO 3 — BUGS CORRIGIDOS (regressão)
@@ -197,248 +147,303 @@ async function runTests() {
   console.log(`\n${c.bold}[ BLOCO 3 — REGRESSÃO DOS BUGS CORRIGIDOS ]${c.reset}`)
   divider()
 
-  // ── BUG 1: Activities pulava questões se lesson já estava completed ────
   section('🐛 Bug 1: Activities não deve usar "completed" da lesson como conclusão')
-  const { data: completedLessons } = await supabase
-    .from('user_progress')
-    .select('lesson_id, completed, answers, score')
-    .eq('completed', true)
-
+  const { data: completedLessons } = await supabase.from('user_progress').select('lesson_id, completed, answers, score').eq('completed', true)
   if (completedLessons && completedLessons.length > 0) {
-    // Lessons que estão completed mas não têm answers salvas
-    // (significa que as atividades foram puladas — o bug antigo)
-    const skippedActivities = completedLessons.filter(p => {
-      const hasAnswers = p.answers && Object.keys(p.answers).length > 0
-      return !hasAnswers
-    })
+    const skipped = completedLessons.filter(p => !p.answers || Object.keys(p.answers).length === 0)
+    if (skipped.length > 0) {
+      warn(`${skipped.length} aula(s) concluída(s) sem respostas salvas`)
+      skipped.forEach(p => info(`Lesson ${p.lesson_id}: score=${p.score}`))
+    } else ok('Todas as aulas concluídas têm respostas registradas')
+  } else { info('Nenhuma aula concluída ainda — OK para conta nova'); passed++ }
 
-    if (skippedActivities.length > 0) {
-      warn(`${skippedActivities.length} aula(s) concluída(s) sem respostas salvas (atividades podem ter sido puladas)`)
-      skippedActivities.forEach(p =>
-        info(`Lesson ${p.lesson_id}: completed=true, answers vazio, score=${p.score}`)
-      )
-    } else {
-      ok('Todas as aulas concluídas têm respostas registradas — atividades não foram puladas')
-    }
-  } else {
-    info('Nenhuma aula concluída ainda — impossível verificar (OK se for conta nova)')
-    passed++
-  }
-
-  // ── BUG 2: video_watched armazenado em formatos inconsistentes ─────────
   section('🐛 Bug 2: Integridade do campo video_watched')
-  const { data: videoProgress } = await supabase
-    .from('user_progress')
-    .select('lesson_id, video_watched')
-    .not('video_watched', 'is', null)
-
+  const { data: videoProgress } = await supabase.from('user_progress').select('lesson_id, video_watched').not('video_watched', 'is', null)
   if (videoProgress && videoProgress.length > 0) {
-    let invalidFormat = []
-    videoProgress.forEach(p => {
-      const vw = p.video_watched
-      // Deve ser array ou objeto (ambos aceitáveis, código já normaliza)
-      const isValid = Array.isArray(vw) || (typeof vw === 'object' && vw !== null)
-      if (!isValid) invalidFormat.push(p.lesson_id)
-    })
+    const invalid = videoProgress.filter(p => !Array.isArray(p.video_watched) && !(typeof p.video_watched === 'object' && p.video_watched !== null))
+    if (invalid.length > 0) fail(`video_watched em formato inválido para lessons: ${invalid.map(p => p.lesson_id).join(', ')}`)
+    else ok(`${videoProgress.length} registro(s) com video_watched em formato válido`)
+  } else { info('Nenhum vídeo assistido registrado ainda — OK para conta nova'); passed++ }
 
-    if (invalidFormat.length > 0)
-      fail(`video_watched em formato inválido para lessons: ${invalidFormat.join(', ')}`)
-    else
-      ok(`${videoProgress.length} registro(s) com video_watched em formato válido`)
-  } else {
-    info('Nenhum vídeo assistido registrado ainda — OK para conta nova')
-    passed++
-  }
-
-  // ── BUG 3: content_read deve ser boolean consistente ───────────────────
   section('🐛 Bug 3: Integridade do campo content_read')
-  const { data: contentProgress } = await supabase
-    .from('user_progress')
-    .select('lesson_id, content_read, completed')
-    .eq('completed', true)
-
+  const { data: contentProgress } = await supabase.from('user_progress').select('lesson_id, content_read, completed').eq('completed', true)
   if (contentProgress && contentProgress.length > 0) {
-    // Aulas concluídas onde content_read é false/null — indica bug de fluxo
     const notRead = contentProgress.filter(p => !p.content_read)
-    if (notRead.length > 0) {
-      warn(`${notRead.length} aula(s) concluída(s) com content_read=false (fluxo pode ter sido ignorado)`)
-      notRead.forEach(p => info(`Lesson ${p.lesson_id}`))
-    } else {
-      ok('Todas as aulas concluídas têm content_read=true')
-    }
-  } else {
-    info('Nenhuma aula concluída ainda — OK para conta nova')
-    passed++
-  }
+    if (notRead.length > 0) { warn(`${notRead.length} aula(s) concluída(s) com content_read=false`); notRead.forEach(p => info(`Lesson ${p.lesson_id}`)) }
+    else ok('Todas as aulas concluídas têm content_read=true')
+  } else { info('Nenhuma aula concluída ainda — OK para conta nova'); passed++ }
 
-  // ── BUG 4: Mapeamento lesson → módulo correto ──────────────────────────
   section('🐛 Bug 4: Mapeamento lesson → módulo (LESSON_MODULE_MAP)')
   const LESSON_MODULE_MAP = { 1:1, 2:2, 3:3, 4:4, 5:4, 6:5, 7:5, 8:5, 9:6 }
-  const MODULE_THEME_IDS  = [1, 2, 3, 4, 5, 6]
-
   let mapOk = true
   Object.entries(LESSON_MODULE_MAP).forEach(([lessonId, moduleId]) => {
-    if (!MODULE_THEME_IDS.includes(moduleId)) {
-      fail(`Lesson ${lessonId} → módulo ${moduleId} não existe em MODULE_THEME`)
-      mapOk = false
-    }
+    if (![1,2,3,4,5,6].includes(moduleId)) { fail(`Lesson ${lessonId} → módulo ${moduleId} inválido`); mapOk = false }
   })
   if (mapOk) ok('Todos os 9 lessonIds mapeiam para módulos válidos (1–6)')
 
-  // ── BUG 5: Progresso inconsistente (aula "completa" sem vídeos) ────────
   section('🐛 Bug 5: Consistência do progresso (completed sem video_watched)')
-  const { data: allProgress } = await supabase
-    .from('user_progress')
-    .select('lesson_id, completed, video_watched, content_read, score')
-
+  const { data: allProgress } = await supabase.from('user_progress').select('lesson_id, completed, video_watched, content_read, score')
   if (allProgress && allProgress.length > 0) {
     const suspicious = allProgress.filter(p => {
-      const hasVideos = Array.isArray(p.video_watched)
-        ? p.video_watched.length > 0
-        : (p.video_watched && Object.keys(p.video_watched).length > 0)
+      const hasVideos = Array.isArray(p.video_watched) ? p.video_watched.length > 0 : (p.video_watched && Object.keys(p.video_watched).length > 0)
       return p.completed && !hasVideos
     })
+    if (suspicious.length > 0) { warn(`${suspicious.length} registro(s) completo(s) sem vídeos`); suspicious.forEach(p => info(`Lesson ${p.lesson_id}`)) }
+    else ok('Nenhum registro concluído sem vídeos — fluxo respeitado')
+  } else { info('Sem registros ainda — OK para conta nova'); passed++ }
 
-    if (suspicious.length > 0) {
-      warn(`${suspicious.length} registro(s) marcado(s) como completo(s) sem vídeos assistidos`)
-      suspicious.forEach(p =>
-        info(`Lesson ${p.lesson_id}: completed=true, video_watched=${JSON.stringify(p.video_watched)}`)
-      )
-    } else {
-      ok('Nenhum registro concluído sem vídeos — fluxo respeitado')
-    }
-  } else {
-    info('Sem registros de progresso ainda — OK para conta nova')
-    passed++
-  }
-
-  // ── BUG 6: Score negativo ou absurdamente alto ─────────────────────────
   section('🐛 Bug 6: Sanidade do score (deve ser entre 0 e 300)')
-  const { data: scores } = await supabase
-    .from('user_progress')
-    .select('lesson_id, score')
-    .not('score', 'is', null)
-
+  const { data: scores } = await supabase.from('user_progress').select('lesson_id, score').not('score', 'is', null)
   if (scores && scores.length > 0) {
     const invalid = scores.filter(p => p.score < 0 || p.score > 300)
-    if (invalid.length > 0) {
-      fail(`${invalid.length} score(s) fora do intervalo esperado (0–300 XP)`)
-      invalid.forEach(p => info(`Lesson ${p.lesson_id}: score=${p.score}`))
-    } else {
-      ok(`${scores.length} score(s) dentro do intervalo válido (0–300 XP)`)
-    }
-  } else {
-    info('Nenhum score registrado ainda — OK para conta nova')
-    passed++
-  }
+    if (invalid.length > 0) { fail(`${invalid.length} score(s) fora do intervalo`); invalid.forEach(p => info(`Lesson ${p.lesson_id}: score=${p.score}`)) }
+    else ok(`${scores.length} score(s) dentro do intervalo válido (0–300 XP)`)
+  } else { info('Nenhum score registrado ainda — OK para conta nova'); passed++ }
 
-  // ── BUG 7: XP do perfil compatível com progresso ───────────────────────
   section('🐛 Bug 7: XP total do perfil vs soma dos scores')
-  const { data: profilesXP } = await supabase
-    .from('profiles')
-    .select('id, username, xp, level')
-
+  const { data: profilesXP } = await supabase.from('profiles').select('id, username, xp, level')
   if (profilesXP && profilesXP.length > 0) {
     for (const user of profilesXP) {
-      const { data: userScores } = await supabase
-        .from('user_progress')
-        .select('score')
-        .eq('user_id', user.id)
-        .eq('completed', true)
-
+      const { data: userScores } = await supabase.from('user_progress').select('score').eq('user_id', user.id).eq('completed', true)
       const totalScore = (userScores || []).reduce((acc, p) => acc + (p.score || 0), 0)
-      const expectedLevel = Math.floor(totalScore / 100) + 1
-
-      // XP do perfil deve ser >= soma dos scores das atividades
-      if (user.xp < totalScore) {
-        warn(`Usuário "${user.username}": XP no perfil (${user.xp}) menor que soma dos scores (${totalScore})`)
-      } else {
-        ok(`Usuário "${user.username}": XP=${user.xp} | Level=${user.level} | Score acumulado=${totalScore}`)
-      }
+      if (user.xp < totalScore) warn(`"${user.username}": XP no perfil (${user.xp}) menor que scores (${totalScore})`)
+      else ok(`"${user.username}": XP=${user.xp} | Level=${user.level} | Score acumulado=${totalScore}`)
     }
-  } else {
-    info('Nenhum usuário encontrado — OK para conta nova')
-    passed++
-  }
+  } else { info('Nenhum usuário — OK para conta nova'); passed++ }
 
-  // ── BUG 8: Módulos têm pelo menos 1 lição com conteúdo ────────────────
   section('🐛 Bug 8: Conteúdo das lições não está vazio')
   try {
     const { modules } = await import('./src/utils/courseData.js')
-    let emptyContent = []
-    modules.forEach(m => {
-      m.lessons?.forEach(l => {
-        if (!l.content || l.content.trim().length < 50) {
-          emptyContent.push(`Módulo ${m.id} / Lesson ${l.id}`)
-        }
-      })
-    })
-    if (emptyContent.length > 0) {
-      warn(`${emptyContent.length} lição(ões) com conteúdo vazio ou muito curto`)
-      emptyContent.forEach(l => info(l))
-    } else {
-      ok('Todas as lições têm conteúdo com pelo menos 50 caracteres')
-    }
-  } catch (e) {
-    fail(`Erro ao verificar conteúdo das lições: ${e.message}`)
-  }
+    const emptyContent = []
+    modules.forEach(m => m.lessons?.forEach(l => {
+      if (!l.content || l.content.trim().length < 50) emptyContent.push(`Módulo ${m.id} / Lesson ${l.id}`)
+    }))
+    if (emptyContent.length > 0) { warn(`${emptyContent.length} lição(ões) com conteúdo vazio`); emptyContent.forEach(l => info(l)) }
+    else ok('Todas as lições têm conteúdo com pelo menos 50 caracteres')
+  } catch (e) { fail(`Erro: ${e.message}`) }
 
-  // ── BUG 9: Todos os exercícios têm campos obrigatórios ────────────────
   section('🐛 Bug 9: Integridade dos exercícios (campos obrigatórios)')
   try {
     const { exercisesByModule } = await import('./src/utils/exercisesData.js')
-    let broken = []
-
+    const broken = []
     Object.entries(exercisesByModule).forEach(([moduleId, mod]) => {
       mod.exercises?.forEach(ex => {
-        const missingFields = []
-        if (!ex.id)          missingFields.push('id')
-        if (!ex.type)        missingFields.push('type')
-        if (!ex.question)    missingFields.push('question')
-        if (!ex.correct)     missingFields.push('correct')
-        if (!ex.explanation) missingFields.push('explanation')
-
-        if (ex.type === 'multiple_choice' && (!ex.options || ex.options.length < 2))
-          missingFields.push('options (< 2)')
-
-        if (missingFields.length > 0)
-          broken.push(`Módulo ${moduleId} / Ex ${ex.id}: [${missingFields.join(', ')}]`)
+        const missing = []
+        if (!ex.id) missing.push('id')
+        if (!ex.type) missing.push('type')
+        if (!ex.question) missing.push('question')
+        if (!ex.correct) missing.push('correct')
+        if (!ex.explanation) missing.push('explanation')
+        if (ex.type === 'multiple_choice' && (!ex.options || ex.options.length < 2)) missing.push('options')
+        if (missing.length > 0) broken.push(`Módulo ${moduleId} / Ex ${ex.id}: [${missing.join(', ')}]`)
       })
     })
+    if (broken.length > 0) { fail(`${broken.length} exercício(s) com campos ausentes`); broken.slice(0,5).forEach(b => info(b)) }
+    else ok('Todos os exercícios têm campos obrigatórios')
+  } catch (e) { fail(`Erro: ${e.message}`) }
 
-    if (broken.length > 0) {
-      fail(`${broken.length} exercício(s) com campos obrigatórios ausentes`)
-      broken.slice(0, 5).forEach(b => info(b))
-      if (broken.length > 5) info(`...e mais ${broken.length - 5}`)
-    } else {
-      ok('Todos os exercícios têm id, type, question, correct, explanation e options')
-    }
-  } catch (e) {
-    fail(`Erro ao verificar exercícios: ${e.message}`)
-  }
-
-  // ── BUG 10: IDs duplicados nos exercícios ────────────────────────────
   section('🐛 Bug 10: IDs duplicados em exercisesData.js')
   try {
     const { exercisesByModule } = await import('./src/utils/exercisesData.js')
     const allIds = []
-    Object.values(exercisesByModule).forEach(mod => {
-      mod.exercises?.forEach(ex => allIds.push(ex.id))
-    })
-
+    Object.values(exercisesByModule).forEach(mod => mod.exercises?.forEach(ex => allIds.push(ex.id)))
     const seen = new Set()
-    const duplicates = allIds.filter(id => {
-      if (seen.has(id)) return true
-      seen.add(id)
-      return false
-    })
+    const duplicates = allIds.filter(id => { if (seen.has(id)) return true; seen.add(id); return false })
+    if (duplicates.length > 0) fail(`IDs duplicados: ${[...new Set(duplicates)].join(', ')}`)
+    else ok(`${allIds.length} exercícios com IDs únicos — sem duplicatas`)
+  } catch (e) { fail(`Erro: ${e.message}`) }
 
-    if (duplicates.length > 0)
-      fail(`IDs duplicados encontrados: ${[...new Set(duplicates)].join(', ')}`)
+  // ══════════════════════════════════════════════════════════════
+  // BLOCO 4 — NOVAS FUNCIONALIDADES
+  // ══════════════════════════════════════════════════════════════
+  console.log(`\n${c.bold}[ BLOCO 4 — NOVAS FUNCIONALIDADES ]${c.reset}`)
+  divider()
+
+  // ── Teste 11: Botão próxima aula — mapeamento correto ─────────────────
+  section('🆕 Teste 11: Mapeamento NEXT_LESSON_MAP (botão próxima aula)')
+  const NEXT_LESSON_MAP = { 1:2, 2:3, 3:4, 4:5, 5:6, 6:7, 7:8, 8:9, 9:null }
+  let nextMapOk = true
+
+  // Verifica que cada lesson aponta para a próxima correta
+  const expectedSequence = [1,2,3,4,5,6,7,8,9]
+  for (let i = 0; i < expectedSequence.length - 1; i++) {
+    const current = expectedSequence[i]
+    const expected = expectedSequence[i + 1]
+    if (NEXT_LESSON_MAP[current] !== expected) {
+      fail(`Lesson ${current} deveria apontar para ${expected}, mas aponta para ${NEXT_LESSON_MAP[current]}`)
+      nextMapOk = false
+    }
+  }
+  if (NEXT_LESSON_MAP[9] !== null) { fail('Lesson 9 deveria apontar para null (última aula)'); nextMapOk = false }
+  if (nextMapOk) ok('Sequência de próximas aulas correta (1→2→3→...→9→null)')
+
+  // Verifica que lesson 9 não tem próxima
+  if (NEXT_LESSON_MAP[9] === null) ok('Lesson 9 corretamente marcada como última (null)')
+  else fail('Lesson 9 deveria ser null')
+
+  // ── Teste 12: Página de perfil — arquivo existe ───────────────────────
+  section('🆕 Teste 12: Página de perfil (Profile.jsx)')
+  const profilePath = path.join(__dirname, 'src/pages/Profile.jsx')
+  if (fs.existsSync(profilePath)) {
+    const content = fs.readFileSync(profilePath, 'utf-8')
+    ok('Profile.jsx encontrado em src/pages/')
+
+    // Verifica componentes essenciais da página
+    const checks = [
+      { key: 'gráfico por módulo',  pattern: /moduleLessonsMap/             },
+      { key: 'barra de XP',         pattern: /currentLevelXP/               },
+      { key: 'achievements',        pattern: /Achievements/                  },
+      { key: 'progresso geral',     pattern: /overallProgress/               },
+      { key: 'stats cards',         pattern: /Total XP/                      },
+    ]
+    checks.forEach(({ key, pattern }) => {
+      if (pattern.test(content)) ok(`Profile: "${key}" implementado`)
+      else warn(`Profile: "${key}" não encontrado — verifique o componente`)
+    })
+  } else {
+    fail('Profile.jsx não encontrado em src/pages/ — crie o arquivo!')
+  }
+
+  // ── Teste 13: Rota /profile no App.jsx ───────────────────────────────
+  section('🆕 Teste 13: Rota /profile registrada no App.jsx')
+  const appPath = path.join(__dirname, 'src/App.jsx')
+  if (fs.existsSync(appPath)) {
+    const appContent = fs.readFileSync(appPath, 'utf-8')
+    if (/import Profile/.test(appContent))       ok('App.jsx: import Profile encontrado')
+    else                                          fail('App.jsx: import Profile NÃO encontrado')
+    if (/path="\/profile"/.test(appContent))     ok('App.jsx: rota /profile registrada')
+    else                                          fail('App.jsx: rota /profile NÃO registrada')
+    if (/ProtectedRoute.*Profile|Profile.*ProtectedRoute/s.test(appContent))
+                                                  ok('App.jsx: /profile está dentro de ProtectedRoute')
+    else                                          warn('App.jsx: verifique se /profile está protegida')
+  } else {
+    fail('App.jsx não encontrado')
+  }
+
+  // ── Teste 14: Header com link para perfil ────────────────────────────
+  section('🆕 Teste 14: Header com link para /profile')
+  const headerPath = path.join(__dirname, 'src/components/Layout/Header.jsx')
+  if (fs.existsSync(headerPath)) {
+    const headerContent = fs.readFileSync(headerPath, 'utf-8')
+    if (/\/profile/.test(headerContent))          ok('Header: link para /profile encontrado')
+    else                                           fail('Header: link para /profile NÃO encontrado')
+    if (/My Profile|Perfil/.test(headerContent))  ok('Header: texto "My Profile" presente')
+    else                                           warn('Header: texto do link de perfil não encontrado')
+    if (/showUserMenu|dropdown/i.test(headerContent)) ok('Header: dropdown do usuário implementado')
+    else                                           warn('Header: dropdown do usuário não detectado')
+  } else {
+    fail('Header.jsx não encontrado')
+  }
+
+  // ── Teste 15: AIChat bloqueado para não logados ───────────────────────
+  section('🆕 Teste 15: AIChat só aparece para usuários logados')
+  if (fs.existsSync(appPath)) {
+    const appContent = fs.readFileSync(appPath, 'utf-8')
+    if (/user && <AIChat/.test(appContent) || /\{user &&.*AIChat/s.test(appContent))
+      ok('App.jsx: AIChat condicionado a {user && <AIChat />}')
     else
-      ok(`${allIds.length} exercícios com IDs únicos — sem duplicatas`)
-  } catch (e) {
-    fail(`Erro ao verificar IDs: ${e.message}`)
+      fail('App.jsx: AIChat pode estar aparecendo para não logados — verifique a condição')
+  }
+
+  // ── Teste 16: Exercícios sem duplicata no lesson content ─────────────
+  section('🆕 Teste 16: Exercícios removidos do Lesson Content')
+  try {
+    const { modules } = await import('./src/utils/courseData.js')
+    const withExercises = []
+    modules.forEach(m => {
+      m.lessons?.forEach(l => {
+        if (l.content && /EXERCÍCIOS PARA FIXAÇÃO|Complete as frases:|Fill in the blank/i.test(l.content)) {
+          withExercises.push(`Módulo ${m.id} / Lesson ${l.id}`)
+        }
+      })
+    })
+    if (withExercises.length > 0) {
+      warn(`${withExercises.length} lição(ões) ainda com exercícios no content (podem estar duplicados com Activities)`)
+      withExercises.forEach(l => info(l))
+    } else {
+      ok('Nenhuma lição com seção de exercícios no content — sem duplicatas')
+    }
+  } catch (e) { fail(`Erro: ${e.message}`) }
+
+  // ── Teste 17: Sequência de módulos e lições consistente ──────────────
+  section('🆕 Teste 17: Consistência entre modules e LESSON_MODULE_MAP')
+  try {
+    const { modules } = await import('./src/utils/courseData.js')
+    const moduleLessonsMap = { 1:[1], 2:[2], 3:[3], 4:[4,5], 5:[6,7,8], 6:[9] }
+    let consistent = true
+
+    Object.entries(moduleLessonsMap).forEach(([moduleId, lessonIds]) => {
+      const module = modules.find(m => m.id === parseInt(moduleId))
+      if (!module) {
+        fail(`Módulo ${moduleId} existe no mapa mas não em courseData.js`)
+        consistent = false
+        return
+      }
+      const moduleLessonIds = module.lessons?.map(l => l.id) || []
+      const missing = lessonIds.filter(id => !moduleLessonIds.includes(id))
+      if (missing.length > 0) {
+        fail(`Módulo ${moduleId}: lessons ${missing.join(', ')} no mapa mas ausentes em courseData.js`)
+        consistent = false
+      }
+    })
+    if (consistent) ok('Todos os módulos e lições estão consistentes entre courseData.js e o mapa')
+  } catch (e) { fail(`Erro: ${e.message}`) }
+
+  // ── Teste 18: api/chat.js usa Anthropic ──────────────────────────────
+  section('🆕 Teste 18: api/chat.js configurado para Anthropic')
+  const chatPath = path.join(__dirname, 'api/chat.js')
+  if (fs.existsSync(chatPath)) {
+    const chatContent = fs.readFileSync(chatPath, 'utf-8')
+    if (/anthropic\.com/.test(chatContent))           ok('api/chat.js: URL da Anthropic encontrada')
+    else                                               fail('api/chat.js: URL da Anthropic NÃO encontrada')
+    if (/ANTHROPIC_API_KEY/.test(chatContent))         ok('api/chat.js: usa ANTHROPIC_API_KEY')
+    else                                               fail('api/chat.js: ANTHROPIC_API_KEY não encontrada')
+    if (/x-api-key/.test(chatContent))                 ok('api/chat.js: header x-api-key presente')
+    else                                               fail('api/chat.js: header x-api-key ausente')
+    if (/claude/.test(chatContent))                    ok('api/chat.js: modelo Claude referenciado')
+    else                                               warn('api/chat.js: modelo Claude não detectado')
+    // Verifica vírgula dupla (bug que causou erro)
+    if (/,\s*,/.test(chatContent))                     fail('api/chat.js: vírgula dupla detectada — erro de sintaxe!')
+    else                                               ok('api/chat.js: sem vírgulas duplas — sintaxe OK')
+  } else {
+    fail('api/chat.js não encontrado em api/')
+  }
+
+  // ── Teste 19: Verificação de variáveis de ambiente ───────────────────
+  section('🆕 Teste 19: Variáveis de ambiente (.env)')
+  try {
+    const envContent = fs.readFileSync(envPath, 'utf-8')
+    const hasSupabaseUrl  = /VITE_SUPABASE_URL=https?:\/\/.+/.test(envContent)
+    const hasSupabaseKey  = /VITE_SUPABASE_ANON_KEY=.{10,}/.test(envContent)
+    const hasAnthropicKey = /ANTHROPIC_API_KEY=.{10,}/.test(envContent)
+    const hasOldOpenAI    = /OPENAI_API_KEY=sk-/.test(envContent)
+
+    if (hasSupabaseUrl)  ok('.env: VITE_SUPABASE_URL configurada')
+    else                 fail('.env: VITE_SUPABASE_URL ausente ou inválida')
+
+    if (hasSupabaseKey)  ok('.env: VITE_SUPABASE_ANON_KEY configurada')
+    else                 fail('.env: VITE_SUPABASE_ANON_KEY ausente')
+
+    if (hasAnthropicKey) ok('.env: ANTHROPIC_API_KEY configurada')
+    else                 fail('.env: ANTHROPIC_API_KEY ausente — chat/voice/essay não vão funcionar')
+
+    if (hasOldOpenAI)    warn('.env: OPENAI_API_KEY ainda presente — pode ser removida')
+
+    // Verifica chave duplicada (bug que causou problema)
+    if (/sk-ant-sk-ant/.test(envContent)) fail('.env: ANTHROPIC_API_KEY com prefixo duplicado (sk-ant-sk-ant-...)')
+    else                                  ok('.env: ANTHROPIC_API_KEY sem prefixo duplicado')
+  } catch (e) { fail(`.env: erro ao ler — ${e.message}`) }
+
+  // ── Teste 20: Conquistas da página de perfil ─────────────────────────
+  section('🆕 Teste 20: Conquistas (achievements) no Profile.jsx')
+  if (fs.existsSync(profilePath)) {
+    const content = fs.readFileSync(profilePath, 'utf-8')
+    const achievements = ['First Steps', 'Bookworm', 'On a Roll', 'Star Student', 'Diamond', 'Champion']
+    const missing = achievements.filter(a => !content.includes(a))
+    if (missing.length > 0) warn(`Conquistas não encontradas: ${missing.join(', ')}`)
+    else ok(`Todas as ${achievements.length} conquistas implementadas no Profile`)
+  } else {
+    fail('Profile.jsx não encontrado — não foi possível verificar conquistas')
   }
 
   // ══════════════════════════════════════════════════════════════
